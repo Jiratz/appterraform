@@ -1,0 +1,113 @@
+resource "oci_core_vcn" "main_vcn" {
+  compartment_id = "{{ compartment_id }}"
+  display_name   = "terraform-vcn"
+  cidr_blocks    = ["10.0.0.0/16"]
+  dns_label      = "mainvcn"
+}
+
+resource "oci_core_internet_gateway" "igw" {
+  compartment_id = "{{ compartment_id }}"
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "terraform-igw"
+  enabled        = true
+}
+
+resource "oci_core_nat_gateway" "nat" {
+  compartment_id = "{{ compartment_id }}"
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "terraform-nat"
+}
+
+resource "oci_core_route_table" "public_rt" {
+  compartment_id = "{{ compartment_id }}"
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "public-route-table"
+
+  route_rules {
+    destination       = "0.0.0.0/0"
+    destination_type  = "CIDR_BLOCK"
+    network_entity_id = oci_core_internet_gateway.igw.id
+  }
+}
+
+resource "oci_core_route_table" "private_rt" {
+  compartment_id = "{{ compartment_id }}"
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "private-route-table"
+
+  route_rules {
+    destination       = "0.0.0.0/0"
+    destination_type  = "CIDR_BLOCK"
+    network_entity_id = oci_core_nat_gateway.nat.id
+  }
+}
+
+resource "oci_core_security_list" "public_sl" {
+  compartment_id = "{{ compartment_id }}"
+  vcn_id         = oci_core_vcn.main_vcn.id
+  display_name   = "public-security-list"
+
+  ingress_security_rules {
+    protocol = "6"
+    source   = "0.0.0.0/0"
+    tcp_options {
+      min = 22
+      max = 22
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "6"
+    source   = "0.0.0.0/0"
+    tcp_options {
+      min = 80
+      max = 80
+    }
+  }
+
+  ingress_security_rules {
+    protocol = "6"
+    source   = "0.0.0.0/0"
+    tcp_options {
+      min = 443
+      max = 443
+    }
+  }
+
+  egress_security_rules {
+    protocol    = "all"
+    destination = "0.0.0.0/0"
+  }
+}
+
+resource "oci_core_subnet" "public_subnet" {
+  compartment_id    = "{{ compartment_id }}"
+  vcn_id            = oci_core_vcn.main_vcn.id
+  display_name      = "public-subnet"
+  cidr_block        = "10.0.1.0/24"
+  dns_label         = "publicsubnet"
+  route_table_id    = oci_core_route_table.public_rt.id
+  security_list_ids = [oci_core_security_list.public_sl.id]
+}
+
+resource "oci_core_subnet" "private_subnet" {
+  compartment_id             = "{{ compartment_id }}"
+  vcn_id                     = oci_core_vcn.main_vcn.id
+  display_name               = "private-subnet"
+  cidr_block                 = "10.0.2.0/24"
+  dns_label                  = "privatesubnet"
+  prohibit_public_ip_on_vnic = true
+  route_table_id             = oci_core_route_table.private_rt.id
+}
+
+output "vcn_id" {
+  value = oci_core_vcn.main_vcn.id
+}
+
+output "public_subnet_id" {
+  value = oci_core_subnet.public_subnet.id
+}
+
+output "private_subnet_id" {
+  value = oci_core_subnet.private_subnet.id
+}

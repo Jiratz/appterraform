@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>อัปโหลดไฟล์</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f5f3; min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 2rem; }
+  .card { background: #fff; border-radius: 16px; border: 1px solid #e5e5e2; padding: 2.5rem 2rem; max-width: 560px; width: 100%; }
+  h1 { font-size: 22px; font-weight: 500; color: #1a1a18; margin-bottom: 4px; }
+  .subtitle { font-size: 14px; color: #6b6b68; margin-bottom: 2rem; }
+  .dropzone { border: 1.5px dashed #c8c8c4; border-radius: 12px; padding: 2.5rem 1.5rem; text-align: center; cursor: pointer; background: #fafaf8; margin-bottom: 1rem; transition: background 0.15s, border-color 0.15s; }
+  .dropzone.drag { background: #EBF4FD; border-color: #378ADD; }
+  .dropzone-icon { font-size: 40px; margin-bottom: 12px; }
+  .dropzone p { font-size: 15px; color: #4a4a48; margin-bottom: 6px; }
+  .dropzone span { font-size: 13px; color: #9a9a97; }
+  .btn-browse { display: inline-block; margin-top: 14px; padding: 8px 22px; border-radius: 8px; border: 1px solid #d0d0cc; font-size: 14px; font-weight: 500; cursor: pointer; background: #fff; color: #1a1a18; transition: background 0.15s; }
+  .btn-browse:hover { background: #f0f0ee; }
+  .file-item { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: #fff; border: 1px solid #e5e5e2; border-radius: 8px; margin-bottom: 8px; font-size: 14px; flex-wrap: wrap; }
+  .file-icon { font-size: 20px; }
+  .file-name { flex: 1; color: #1a1a18; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .file-size { color: #9a9a97; font-size: 12px; white-space: nowrap; }
+  .file-remove { cursor: pointer; color: #9a9a97; font-size: 18px; line-height: 1; padding: 0 2px; }
+  .file-remove:hover { color: #c0392b; }
+  .prog-wrap { display: none; height: 4px; background: #e5e5e2; border-radius: 4px; margin-top: 6px; overflow: hidden; width: 100%; }
+  .prog-bar { height: 100%; background: #378ADD; border-radius: 4px; width: 0%; transition: width 0.2s; }
+  #fileList { margin-bottom: 1rem; }
+  .btn-upload { width: 100%; padding: 12px; background: #378ADD; color: #fff; border: none; border-radius: 8px; font-size: 15px; font-weight: 500; cursor: pointer; transition: background 0.15s; }
+  .btn-upload:hover { background: #185FA5; }
+  .btn-upload:disabled { background: #c8c8c4; cursor: not-allowed; }
+  .result-box { margin-top: 1rem; padding: 12px 14px; border-radius: 8px; font-size: 14px; display: none; }
+  .result-box.success { background: #EAF3DE; color: #3B6D11; border: 1px solid #97C459; }
+  .result-box.error { background: #FCEBEB; color: #A32D2D; border: 1px solid #F09595; }
+  .footer { margin-top: 1.5rem; text-align: center; font-size: 12px; color: #b0b0ac; }
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>&#128228; อัปโหลดไฟล์</h1>
+  <p class="subtitle">ลากไฟล์มาวางหรือกดเลือกไฟล์ได้เลย รองรับทุกประเภทไฟล์</p>
+  <div class="dropzone" id="dropzone">
+    <div class="dropzone-icon">&#128193;</div>
+    <p>ลากไฟล์มาวางที่นี่</p>
+    <span>หรือกดปุ่มด้านล่างเพื่อเลือกไฟล์</span><br>
+    <button class="btn-browse" onclick="document.getElementById('fileInput').click()">&#128194; เลือกไฟล์</button>
+    <input type="file" id="fileInput" multiple style="display:none">
+  </div>
+  <div id="fileList"></div>
+  <button class="btn-upload" id="btnUpload" disabled onclick="uploadAll()">&#9650; อัปโหลด</button>
+  <div class="result-box" id="resultBox"></div>
+  <p class="footer">ไฟล์จะถูกอัปโหลดไปยัง OCI Object Storage</p>
+</div>
+<script>
+var BACKEND = 'http://134.185.162.105:8000';
+var files = [];
+var dropzone  = document.getElementById('dropzone');
+var fileInput = document.getElementById('fileInput');
+var fileList  = document.getElementById('fileList');
+var btnUpload = document.getElementById('btnUpload');
+var resultBox = document.getElementById('resultBox');
+
+dropzone.addEventListener('dragover', function(e) { e.preventDefault(); dropzone.classList.add('drag'); });
+dropzone.addEventListener('dragleave', function() { dropzone.classList.remove('drag'); });
+dropzone.addEventListener('drop', function(e) { e.preventDefault(); dropzone.classList.remove('drag'); addFiles([].slice.call(e.dataTransfer.files)); });
+fileInput.addEventListener('change', function() { addFiles([].slice.call(fileInput.files)); fileInput.value = ''; });
+
+function addFiles(newFiles) {
+  newFiles.forEach(function(f) { if (!files.find(function(x) { return x.name === f.name; })) files.push(f); });
+  renderList();
+}
+function removeFile(name) { files = files.filter(function(f) { return f.name !== name; }); renderList(); }
+function fmtSize(n) {
+  if (n < 1024) return n + ' B';
+  if (n < 1048576) return (n/1024).toFixed(1) + ' KB';
+  return (n/1048576).toFixed(1) + ' MB';
+}
+function safeId(name) { return name.replace(/[^a-zA-Z0-9]/g, '_'); }
+
+function renderList() {
+  fileList.innerHTML = '';
+  files.forEach(function(f) {
+    var id = safeId(f.name);
+    var div = document.createElement('div');
+    div.className = 'file-item';
+    div.innerHTML =
+      '<span class="file-icon">&#128196;</span>' +
+      '<span class="file-name">' + f.name + '</span>' +
+      '<span class="file-size">' + fmtSize(f.size) + '</span>' +
+      '<span class="file-remove" onclick="removeFile(\'' + f.name.replace(/\\/g,'\\\\').replace(/'/g,"\\'") + '\')">&#10005;</span>' +
+      '<div class="prog-wrap" id="prog-' + id + '" style="width:100%;"><div class="prog-bar" id="bar-' + id + '"></div></div>';
+    fileList.appendChild(div);
+  });
+  btnUpload.disabled = files.length === 0;
+  resultBox.style.display = 'none';
+}
+
+function uploadFile(file) {
+  var id = safeId(file.name);
+  var progWrap = document.getElementById('prog-' + id);
+  var bar = document.getElementById('bar-' + id);
+  if (progWrap) progWrap.style.display = 'block';
+  return new Promise(function(resolve, reject) {
+    var xhr = new XMLHttpRequest();
+    var form = new FormData();
+    form.append('file', file);
+    xhr.open('POST', BACKEND + '/api/upload');
+    xhr.upload.onprogress = function(e) {
+      if (e.lengthComputable && bar) bar.style.width = Math.round(e.loaded / e.total * 100) + '%';
+    };
+    xhr.onload = function() {
+      try {
+        var res = JSON.parse(xhr.responseText);
+        if (xhr.status === 200 && res.success) resolve();
+        else reject(res.error || xhr.status);
+      } catch(e) { reject('parse error'); }
+    };
+    xhr.onerror = function() { reject('network error'); };
+    xhr.send(form);
+  });
+}
+
+async function uploadAll() {
+  btnUpload.disabled = true;
+  resultBox.style.display = 'none';
+  var success = 0, fail = 0;
+  for (var i = 0; i < files.length; i++) {
+    try { await uploadFile(files[i]); success++; } catch(e) { fail++; }
+  }
+  resultBox.style.display = 'block';
+  if (fail === 0) {
+    resultBox.className = 'result-box success';
+    resultBox.textContent = '\u2713 \u0e2d\u0e31\u0e1b\u0e42\u0e2b\u0e25\u0e14\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 ' + success + ' \u0e44\u0e1f\u0e25\u0e4c';
+    files = []; renderList();
+  } else {
+    resultBox.className = 'result-box error';
+    resultBox.textContent = '\u0e2a\u0e33\u0e40\u0e23\u0e47\u0e08 ' + success + ' \u0e44\u0e1f\u0e25\u0e4c, \u0e25\u0e49\u0e21\u0e40\u0e2b\u0e25\u0e27 ' + fail + ' \u0e44\u0e1f\u0e25\u0e4c';
+    btnUpload.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

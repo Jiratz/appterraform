@@ -1,0 +1,15 @@
+{
+  "credentials": {
+    "tenancy_ocid": "ocid1.tenancy.oc1.test",
+    "user_ocid": "ocid1.user.oc1.test",
+    "fingerprint": "aa:bb:cc:dd:ee:ff",
+    "private_key": "-----BEGIN RSA PRIVATE KEY-----\nMIItest\n-----END RSA PRIVATE KEY-----",
+    "region": "ap-pathumthani-1"
+  },
+  "compartment_id": "ocid1.compartment.oc1.test",
+  "vcn_id": "ocid1.vcn.test",
+  "subnet_id": "ocid1.subnet.test",
+  "resources": ["vcn", "vm", "oke"],
+  "vm_shape": "VM.Standard.E5.Flex",
+  "vm_image_id": "ocid1.image.test"
+}

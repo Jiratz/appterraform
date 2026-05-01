@@ -1,0 +1,6 @@
+venv/
+__pycache__/
+*.pyc
+terraform_workspace/
+*.pem
+.env

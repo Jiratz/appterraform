@@ -1,0 +1,98 @@
+# ---------------------------------------------------------
+# Bastion Host — VM จริงที่มี Public IP สำหรับ jump เข้า private
+# ---------------------------------------------------------
+
+data "oci_identity_availability_domains" "bastion_ads" {
+  compartment_id = "{{ compartment_id }}"
+}
+
+# Network Security Group สำหรับ Bastion
+resource "oci_core_network_security_group" "bastion_nsg" {
+  compartment_id = "{{ compartment_id }}"
+  vcn_id         = "{{ vcn_id }}"
+  display_name   = "bastion-nsg"
+}
+
+# เปิดแค่ port 22 จากภายนอก
+resource "oci_core_network_security_group_security_rule" "bastion_ssh_ingress" {
+  network_security_group_id = oci_core_network_security_group.bastion_nsg.id
+  direction                 = "INGRESS"
+  protocol                  = "6"
+  source                    = "0.0.0.0/0"
+  source_type               = "CIDR_BLOCK"
+
+  tcp_options {
+    destination_port_range {
+      min = 22
+      max = 22
+    }
+  }
+}
+
+resource "oci_core_network_security_group_security_rule" "bastion_egress" {
+  network_security_group_id = oci_core_network_security_group.bastion_nsg.id
+  direction                 = "EGRESS"
+  protocol                  = "all"
+  destination               = "0.0.0.0/0"
+  destination_type          = "CIDR_BLOCK"
+}
+
+# Bastion Host VM (Public IP + hardened)
+resource "oci_core_instance" "bastion_host" {
+  compartment_id      = "{{ compartment_id }}"
+  availability_domain = data.oci_identity_availability_domains.bastion_ads.availability_domains[0].name
+  display_name        = "bastion-host"
+  shape               = "{{ vm_shape }}"
+
+  shape_config {
+    ocpus         = 1
+    memory_in_gbs = 8
+  }
+
+  source_details {
+    source_type = "image"
+    source_id   = "{{ vm_image_id }}"
+  }
+
+  # ต้องอยู่ใน Public subnet เพื่อให้มี Public IP
+  create_vnic_details {
+    subnet_id        = "{{ subnet_id }}"
+    assign_public_ip = true
+    display_name     = "bastion-vnic"
+    hostname_label   = "bastion"
+    nsg_ids          = [oci_core_network_security_group.bastion_nsg.id]
+  }
+
+  metadata = {
+    ssh_authorized_keys = file("~/.ssh/id_rsa.pub")
+    user_data = base64encode(<<-EOF
+      #!/bin/bash
+      # Harden Bastion Host
+      dnf update -y
+      sed -i 's/#PermitRootLogin yes/PermitRootLogin no/' /etc/ssh/sshd_config
+      sed -i 's/#PasswordAuthentication yes/PasswordAuthentication no/' /etc/ssh/sshd_config
+      systemctl restart sshd
+      systemctl enable --now firewalld
+      firewall-cmd --permanent --add-service=ssh
+      firewall-cmd --reload
+    EOF
+    )
+  }
+
+  preserve_boot_volume = false
+}
+
+# Outputs
+output "bastion_public_ip" {
+  value       = oci_core_instance.bastion_host.public_ip
+  description = "Public IP ของ Bastion Host — ใช้ SSH เข้า"
+}
+
+output "bastion_private_ip" {
+  value = oci_core_instance.bastion_host.private_ip
+}
+
+output "bastion_ssh_command" {
+  value       = "ssh -J opc@${oci_core_instance.bastion_host.public_ip} opc@<PRIVATE_VM_IP>"
+  description = "คำสั่ง SSH ผ่าน Bastion ไปยัง VM ใน Private Subnet"
+}

@@ -1,0 +1,19 @@
+resource "oci_database_autonomous_database" "adb" {
+  compartment_id           = "{{ compartment_id }}"
+  display_name             = "{{ db_display_name }}"
+  db_name                  = "terraformdb"
+  cpu_core_count           = 1
+  data_storage_size_in_tbs = 1
+  db_workload              = "OLTP"
+  is_free_tier             = true
+  admin_password           = "Terraform#123456"
+
+  lifecycle {
+    ignore_changes = [admin_password]
+  }
+}
+
+output "adb_connection_strings" {
+  value     = oci_database_autonomous_database.adb.connection_strings
+  sensitive = true
+}

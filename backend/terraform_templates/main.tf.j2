@@ -1,0 +1,186 @@
+terraform {
+  required_providers {
+    oci = {
+      source  = "oracle/oci"
+      version = ">= 5.0.0"
+    }
+  }
+}
+
+provider "oci" {
+  tenancy_ocid     = "{{ tenancy_ocid }}"
+  user_ocid        = "{{ user_ocid }}"
+  fingerprint      = "{{ fingerprint }}"
+  private_key      = <<-PKEY
+{{ private_key }}
+  PKEY
+  region           = "{{ region }}"
+}
+
+locals {
+  compartment_id = "{{ compartment_ocid }}"
+}
+
+{% if create_vcn %}
+resource "oci_core_vcn" "main" {
+  compartment_id = local.compartment_id
+  display_name   = "{{ vcn_name }}"
+  cidr_block     = "{{ vcn_cidr }}"
+}
+
+resource "oci_core_internet_gateway" "igw" {
+  compartment_id = local.compartment_id
+  vcn_id         = oci_core_vcn.main.id
+  display_name   = "igw"
+  enabled        = true
+}
+
+resource "oci_core_route_table" "rt" {
+  compartment_id = local.compartment_id
+  vcn_id         = oci_core_vcn.main.id
+  display_name   = "public-rt"
+  route_rules {
+    destination       = "0.0.0.0/0"
+    network_entity_id = oci_core_internet_gateway.igw.id
+  }
+}
+
+resource "oci_core_subnet" "public" {
+  compartment_id    = local.compartment_id
+  vcn_id            = oci_core_vcn.main.id
+  cidr_block        = cidrsubnet("{{ vcn_cidr }}", 8, 0)
+  display_name      = "public-subnet"
+  route_table_id    = oci_core_route_table.rt.id
+  security_list_ids = [oci_core_vcn.main.default_security_list_id]
+}
+
+locals {
+  vcn_id    = oci_core_vcn.main.id
+  subnet_id = oci_core_subnet.public.id
+}
+{% else %}
+locals {
+  vcn_id    = "{{ vcn_id }}"
+  subnet_id = data.oci_core_subnets.existing.subnets[0].id
+}
+
+data "oci_core_subnets" "existing" {
+  compartment_id = local.compartment_id
+  vcn_id         = "{{ vcn_id }}"
+}
+{% endif %}
+
+{% if resources.get('vm') %}
+{% set vm = vm %}
+data "oci_core_images" "ol8" {
+  compartment_id           = local.compartment_id
+  operating_system         = "Oracle Linux"
+  operating_system_version = "8"
+  shape                    = "{{ vm.get('shape', 'VM.Standard.E4.Flex') }}"
+  sort_by                  = "TIMECREATED"
+  sort_order               = "DESC"
+}
+
+resource "oci_core_instance" "vm" {
+  compartment_id      = local.compartment_id
+  availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+  display_name        = "app-vm"
+  shape               = "{{ vm.get('shape', 'VM.Standard.E4.Flex') }}"
+
+  shape_config {
+    ocpus         = {{ vm.get('ocpus', 1) }}
+    memory_in_gbs = {{ vm.get('memory_in_gbs', 16) }}
+  }
+
+  source_details {
+    source_type = "image"
+    source_id   = data.oci_core_images.ol8.images[0].id
+  }
+
+  create_vnic_details {
+    subnet_id        = local.subnet_id
+    assign_public_ip = true
+  }
+
+  {% if vm.get('ssh_authorized_keys') %}
+  metadata = {
+    ssh_authorized_keys = "{{ vm.get('ssh_authorized_keys', '') }}"
+  }
+  {% endif %}
+}
+
+output "vm_public_ip" {
+  value = oci_core_instance.vm.public_ip
+}
+{% endif %}
+
+{% if resources.get('oke') %}
+{% set oke = oke %}
+resource "oci_containerengine_cluster" "oke" {
+  compartment_id     = local.compartment_id
+  name               = "app-oke"
+  vcn_id             = local.vcn_id
+  kubernetes_version = "{{ oke.get('k8s_version', 'v1.29.1') }}"
+
+  endpoint_config {
+    is_public_ip_enabled = true
+    subnet_id            = local.subnet_id
+  }
+
+  options {
+    add_ons {
+      is_kubernetes_dashboard_enabled = false
+      is_tiller_enabled               = false
+    }
+  }
+}
+
+resource "oci_containerengine_node_pool" "pool" {
+  cluster_id         = oci_containerengine_cluster.oke.id
+  compartment_id     = local.compartment_id
+  name               = "pool1"
+  kubernetes_version = "{{ oke.get('k8s_version', 'v1.29.1') }}"
+  node_shape         = "{{ oke.get('node_shape', 'VM.Standard.E4.Flex') }}"
+
+  node_shape_config {
+    ocpus         = 2
+    memory_in_gbs = 16
+  }
+
+  node_config_details {
+    size = {{ oke.get('node_count', 2) }}
+    placement_configs {
+      availability_domain = data.oci_identity_availability_domains.ads.availability_domains[0].name
+      subnet_id           = local.subnet_id
+    }
+  }
+}
+
+output "oke_cluster_id" {
+  value = oci_containerengine_cluster.oke.id
+}
+{% endif %}
+
+{% if resources.get('db') %}
+{% set db = db %}
+resource "oci_database_autonomous_database" "adb" {
+  compartment_id           = local.compartment_id
+  db_name                  = "{{ db.get('name', 'appdb') }}"
+  display_name             = "{{ db.get('name', 'appdb') }}"
+  cpu_core_count           = {{ db.get('cpu_count', 1) }}
+  data_storage_size_in_tbs = 1
+  admin_password           = "{{ db.get('admin_password', 'Welcome1#') }}"
+  db_workload              = "OLTP"
+  is_auto_scaling_enabled  = false
+  is_free_tier             = false
+}
+
+output "adb_connection_string" {
+  value     = oci_database_autonomous_database.adb.connection_strings[0].profiles[0].value
+  sensitive = true
+}
+{% endif %}
+
+data "oci_identity_availability_domains" "ads" {
+  compartment_id = local.compartment_id
+}

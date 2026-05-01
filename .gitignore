@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+venv/
+.env
+
+# Node / Next.js
+node_modules/
+.next/
+frontend/node_modules/
+frontend/.next/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+
+# OCI Keys (สำคัญมาก - ห้าม commit)
+*.pem
+*.key
+backend/workspaces/
+
+# OS
+.DS_Store
+*.log
+nohup.out
