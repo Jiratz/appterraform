@@ -49,6 +49,27 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Multi-Tenancy & Landing Zone */}
+      <div className="max-w-4xl mx-auto px-8 pb-16">
+        <h3 className="text-2xl font-bold text-center mb-8">🏗️ Multi-Tenancy Landing Zone</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Link href="/tenancies">
+            <div className="bg-gray-900 border border-gray-800 hover:border-purple-600 rounded-xl p-6 transition cursor-pointer">
+              <div className="text-3xl mb-3">🏢</div>
+              <div className="font-semibold mb-1">Tenancy Manager</div>
+              <div className="text-gray-400 text-sm">จัดการ OCI credentials หลาย tenancy — Production, Staging, Dev</div>
+            </div>
+          </Link>
+          <Link href="/landing-zone">
+            <div className="bg-gray-900 border border-gray-800 hover:border-green-600 rounded-xl p-6 transition cursor-pointer">
+              <div className="text-3xl mb-3">🏗️</div>
+              <div className="font-semibold mb-1">Landing Zone Wizard</div>
+              <div className="text-gray-400 text-sm">Deploy Compartments, IAM, Network, Security, Bastion, Vault ด้วย Wizard</div>
+            </div>
+          </Link>
+        </div>
+      </div>
+
       {/* Features */}
       <div className="max-w-4xl mx-auto px-8 pb-20">
         <h3 className="text-2xl font-bold text-center mb-8">สร้างได้อะไรบ้าง</h3>
