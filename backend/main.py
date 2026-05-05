@@ -400,3 +400,67 @@ async def terraform_status():
         return get_last_status()
     except Exception:
         return {"status": "idle", "output": ""}
+
+
+# ══════════════════════════════════════════════════════════
+#  DASHBOARD
+# ══════════════════════════════════════════════════════════
+
+@app.get("/api/dashboard")
+async def dashboard():
+    """Summary stats for the dashboard page."""
+    tenancies = list_tenancies()
+    tenancy_count = len(tenancies)
+
+    # Files count
+    files_count = 0
+    try:
+        resp = _storage_client().list_objects(OCI_NAMESPACE, OCI_BUCKET)
+        files_count = len(resp.data.objects or [])
+    except Exception:
+        pass
+
+    # Landing zone workspaces with terraform.tfstate (= deployed)
+    lz_deployed = 0
+    lz_total = 0
+    try:
+        for d in os.listdir(WORKSPACE_DIR):
+            ws = os.path.join(WORKSPACE_DIR, d)
+            if os.path.isdir(ws):
+                lz_total += 1
+                if os.path.exists(os.path.join(ws, "terraform.tfstate")):
+                    lz_deployed += 1
+    except Exception:
+        pass
+
+    # Active jobs
+    active_jobs = [j for j in _jobs.values() if j.get("status") in ("pending", "running")]
+
+    # Per-tenancy LZ status
+    tenancy_lz = {}
+    try:
+        for d in os.listdir(WORKSPACE_DIR):
+            ws = os.path.join(WORKSPACE_DIR, d)
+            if os.path.isdir(ws) and os.path.exists(os.path.join(ws, "terraform.tfstate")):
+                tenancy_lz[d] = "deployed"
+    except Exception:
+        pass
+
+    tenancy_summary = []
+    for t in tenancies:
+        tid = t["id"]
+        tenancy_summary.append({
+            "id": tid,
+            "name": t.get("name", tid),
+            "region": t.get("region", ""),
+            "lz_status": tenancy_lz.get(tid, "none"),
+        })
+
+    return {
+        "tenancy_count": tenancy_count,
+        "files_count": files_count,
+        "lz_deployed": lz_deployed,
+        "lz_total": lz_total,
+        "active_jobs": len(active_jobs),
+        "tenancies": tenancy_summary,
+    }

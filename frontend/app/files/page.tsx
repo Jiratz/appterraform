@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useToast } from "../components/Toast";
 
-const API = "http://134.185.162.105:8000";
+const API = process.env.NEXT_PUBLIC_API_URL || "";
 const UPLOAD_PASSWORD = "ociupload2026";
 
 interface FileItem {
