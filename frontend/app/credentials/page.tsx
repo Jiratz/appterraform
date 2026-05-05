@@ -43,8 +43,8 @@ export default function CredentialsPage() {
       });
       if (res.ok) {
         setStatus("ok");
-        // เก็บ credentials ใน sessionStorage
-        sessionStorage.setItem("oci_credentials", JSON.stringify(form));
+        // เก็บ credentials ใน localStorage
+        localStorage.setItem("oci_credentials", JSON.stringify(form));
         setTimeout(() => { window.location.href = "/vcn"; }, 1000);
       } else {
         setStatus("error");

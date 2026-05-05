@@ -14,9 +14,9 @@ export default function DeployPage() {
   const logsEndRef = useRef<HTMLDivElement>(null);
 
   const getPayload = () => ({
-    credentials: JSON.parse(sessionStorage.getItem("oci_credentials") || "{}"),
-    vcn: JSON.parse(sessionStorage.getItem("oci_vcn") || "{}"),
-    resources: JSON.parse(sessionStorage.getItem("oci_resources") || "{}"),
+    credentials: JSON.parse(localStorage.getItem("oci_credentials") || "{}"),
+    vcn: JSON.parse(localStorage.getItem("oci_vcn") || "{}"),
+    resources: JSON.parse(localStorage.getItem("oci_resources") || "{}"),
   });
 
   // ดึง terraform plan
@@ -49,6 +49,12 @@ export default function DeployPage() {
       if (msg.type === "log") {
         setLogs((prev) => [...prev, msg.message || msg.data]);
       } else if (msg.type === "done") {
+        if (!msg.success) {
+          setLogs((prev) => [...prev, "Apply failed"]);
+          setPhase("error");
+          ws.close();
+          return;
+        }
         setOutputs(msg.outputs || {});
         setPhase("done");
         ws.close();
@@ -143,7 +149,7 @@ export default function DeployPage() {
         )}
 
         {/* Outputs */}
-        {phase === "done" && Object.keys(outputs).length > 0 && (
+        {phase === "done" && (
           <div className="bg-gray-900 border border-green-800 rounded-xl p-6">
             <h3 className="font-semibold text-green-400 mb-4">🎉 Infrastructure พร้อมแล้ว!</h3>
             <div className="space-y-3">
@@ -154,9 +160,33 @@ export default function DeployPage() {
                 </div>
               ))}
             </div>
-            <a href="/" className="mt-6 block text-center text-red-500 hover:underline text-sm">
-              กลับหน้าหลัก
-            </a>
+            {outputs.vm_public_ip && (
+              <div className="mt-5 bg-gray-800 border border-gray-700 rounded-lg p-4">
+                <div className="text-xs text-gray-400 mb-2">�� SSH Command</div>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 font-mono text-sm text-green-300 break-all">
+                    ssh opc@{outputs.vm_public_ip}
+                  </code>
+                  <button
+                    onClick={() => navigator.clipboard.writeText("ssh opc@" + outputs.vm_public_ip)}
+                    className="flex-shrink-0 px-3 py-1.5 bg-gray-700 hover:bg-gray-600 text-xs text-gray-300 rounded-lg transition"
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div className="text-xs text-yellow-500 mt-2">
+                  ⚠️ ต้องมี SSH Private Key ของ public key ที่ใส่ไว้ตอน deploy
+                </div>
+              </div>
+            )}
+            <div className="mt-5 flex gap-3">
+              <a href="/vms" className="flex-1 text-center py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-lg text-sm transition">
+                📋 ไปหน้า VM Manager
+              </a>
+              <a href="/" className="flex-1 text-center py-2 text-red-500 hover:underline text-sm flex items-center justify-center">
+                กลับหน้าหลัก
+              </a>
+            </div>
           </div>
         )}
       </div>

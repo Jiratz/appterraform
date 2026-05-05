@@ -1,7 +1,7 @@
 "use client";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Server, Network, Database, Shield } from "lucide-react";
+import { Server, Network, Database, Shield, ShieldCheck } from "lucide-react";
 
 const SHAPES = ["VM.Standard.E5.Flex", "VM.Standard.E4.Flex", "VM.Standard3.Flex", "VM.Standard2.1", "VM.Standard2.2"];
 const K8S_VERSIONS = ["v1.34.2", "v1.33.0", "v1.32.0"];
@@ -12,7 +12,14 @@ export default function ResourcesPage() {
     vm: false, oke: false, db: false, bastion: false,
   });
 
-  const [vmConfig, setVmConfig] = useState({ name: "my-vm", shape: "VM.Standard.E5.Flex", ocpus: 2, memory: 16, ssh_key: "" });
+  const [vmConfig, setVmConfig] = useState({
+    name: "my-vm",
+    shape: "VM.Standard.E5.Flex",
+    ocpus: 2,
+    memory: 16,
+    ssh_key: "",
+    open_ports: true,
+  });
   const [okeConfig, setOkeConfig] = useState({ name: "my-cluster", k8s_version: "v1.34.2", node_shape: "VM.Standard.E5.Flex", node_count: 2, node_ocpus: 2, node_memory: 16 });
   const [dbConfig, setDbConfig] = useState({ name: "mydb", cpu_count: 2, storage_tb: 1, password: "" });
 
@@ -25,7 +32,7 @@ export default function ResourcesPage() {
       oke: okeConfig,
       db: dbConfig,
     };
-    sessionStorage.setItem("oci_resources", JSON.stringify(config));
+    localStorage.setItem("oci_resources", JSON.stringify(config));
     window.location.href = "/deploy";
   };
 
@@ -66,34 +73,74 @@ export default function ResourcesPage() {
             onToggle={() => toggle("vm")}
           >
             {selected.vm && (
-              <div className="mt-4 grid grid-cols-2 gap-4">
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">ชื่อ Instance</label>
-                  <input value={vmConfig.name} onChange={(e) => setVmConfig({ ...vmConfig, name: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">ชื่อ Instance</label>
+                    <input value={vmConfig.name} onChange={(e) => setVmConfig({ ...vmConfig, name: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Shape</label>
+                    <select value={vmConfig.shape} onChange={(e) => setVmConfig({ ...vmConfig, shape: e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500">
+                      {SHAPES.map((s) => <option key={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">OCPUs</label>
+                    <input type="number" min={1} max={64} value={vmConfig.ocpus} onChange={(e) => setVmConfig({ ...vmConfig, ocpus: +e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 mb-1 block">Memory (GB)</label>
+                    <input type="number" min={1} max={512} value={vmConfig.memory} onChange={(e) => setVmConfig({ ...vmConfig, memory: +e.target.value })}
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
+                  </div>
+                  <div className="col-span-2">
+                    <label className="text-xs text-gray-400 mb-1 block">SSH Public Key</label>
+                    <textarea value={vmConfig.ssh_key} onChange={(e) => setVmConfig({ ...vmConfig, ssh_key: e.target.value })}
+                      placeholder="ssh-rsa AAAA..." rows={2}
+                      className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-red-500 resize-none" />
+                  </div>
                 </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Shape</label>
-                  <select value={vmConfig.shape} onChange={(e) => setVmConfig({ ...vmConfig, shape: e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500">
-                    {SHAPES.map((s) => <option key={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">OCPUs</label>
-                  <input type="number" min={1} max={64} value={vmConfig.ocpus} onChange={(e) => setVmConfig({ ...vmConfig, ocpus: +e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
-                </div>
-                <div>
-                  <label className="text-xs text-gray-400 mb-1 block">Memory (GB)</label>
-                  <input type="number" min={1} max={512} value={vmConfig.memory} onChange={(e) => setVmConfig({ ...vmConfig, memory: +e.target.value })}
-                    className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm focus:outline-none focus:border-red-500" />
-                </div>
-                <div className="col-span-2">
-                  <label className="text-xs text-gray-400 mb-1 block">SSH Public Key</label>
-                  <textarea value={vmConfig.ssh_key} onChange={(e) => setVmConfig({ ...vmConfig, ssh_key: e.target.value })}
-                    placeholder="ssh-rsa AAAA..." rows={2}
-                    className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-red-500 resize-none" />
+
+                {/* Security List Option */}
+                <div
+                  onClick={() => setVmConfig({ ...vmConfig, open_ports: !vmConfig.open_ports })}
+                  className={`flex items-start gap-3 p-4 rounded-xl border cursor-pointer transition
+                    ${vmConfig.open_ports
+                      ? "border-green-600 bg-green-600/10"
+                      : "border-gray-700 hover:border-gray-500 bg-gray-800/40"}`}
+                >
+                  <div className={`mt-0.5 w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition
+                    ${vmConfig.open_ports ? "border-green-500 bg-green-500" : "border-gray-600"}`}>
+                    {vmConfig.open_ports && (
+                      <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                      </svg>
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 font-medium text-sm">
+                      <ShieldCheck size={15} className={vmConfig.open_ports ? "text-green-400" : "text-gray-500"} />
+                      Auto-open Security Ports (NSG)
+                    </div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      สร้าง Network Security Group เปิด port อัตโนมัติ:
+                      <span className="ml-1 space-x-1">
+                        <span className="bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded font-mono">22</span>
+                        <span className="text-gray-500">SSH</span>
+                        <span className="bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded font-mono ml-1">80</span>
+                        <span className="text-gray-500">HTTP</span>
+                        <span className="bg-gray-700 text-gray-300 px-1.5 py-0.5 rounded font-mono ml-1">443</span>
+                        <span className="text-gray-500">HTTPS</span>
+                      </span>
+                    </div>
+                    {!vmConfig.open_ports && (
+                      <div className="text-xs text-yellow-500 mt-1">⚠️ ปิดอยู่ — SSH อาจเข้าไม่ได้หลัง deploy</div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}

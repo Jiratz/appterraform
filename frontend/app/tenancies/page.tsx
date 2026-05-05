@@ -113,6 +113,8 @@ export default function TenanciesPage() {
                   <div key={key}>
                     <label className="text-sm text-gray-400 mb-1 block">{label}</label>
                     <input
+                      title={label}
+                      placeholder={label}
                       type={type}
                       value={(form as any)[key]}
                       onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}

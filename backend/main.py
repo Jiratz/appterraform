@@ -2,8 +2,9 @@ import json
 import uuid
 import asyncio
 import os
+import secrets
 import oci
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Header, HTTPException
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -29,6 +30,18 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# ── Internal API Key (protect sensitive endpoints) ────────────────────────────
+_API_KEY = os.environ.get("OCI_MANAGER_API_KEY", "")
+
+
+def _require_api_key(request: Request):
+    """ตรวจ X-API-Key header — ถ้าไม่ได้ set env ก็ skip (backward compat)"""
+    if not _API_KEY:
+        return  # ยังไม่ได้ configure key → allow all (เพื่อ backward compat)
+    key = request.headers.get("x-api-key", "")
+    if not secrets.compare_digest(key, _API_KEY):
+        raise HTTPException(401, "Unauthorized")
 
 
 def parse_creds(x_credentials: str) -> dict:

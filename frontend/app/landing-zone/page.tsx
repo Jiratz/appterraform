@@ -299,6 +299,8 @@ function LandingZoneInner() {
                         placeholder="subnet name"
                         className="flex-1 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none" />
                       <input value={sn.cidr}
+                        title="CIDR"
+                        placeholder="CIDR"
                         onChange={e => { const v = [...config.network.vcns]; v[vi].subnets[si] = { ...sn, cidr: e.target.value }; setC({ network: { vcns: v } }); }}
                         className="w-32 bg-gray-700 border border-gray-600 rounded-lg px-2 py-1 text-xs text-white focus:outline-none" />
                       <label className="text-xs text-gray-400 flex items-center gap-1">
@@ -374,7 +376,7 @@ function LandingZoneInner() {
                   onChange={e => { const a = [...config.storage.buckets]; a[i] = { ...a[i], name: e.target.value }; setC({ storage: { buckets: a } }); }}
                   placeholder="bucket name"
                   className="flex-1 bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500" />
-                <select value={b.versioning}
+                <select title="Versioning" value={b.versioning}
                   onChange={e => { const a = [...config.storage.buckets]; a[i] = { ...a[i], versioning: e.target.value }; setC({ storage: { buckets: a } }); }}
                   className="bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none">
                   <option value="Disabled">Versioning Off</option>

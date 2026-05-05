@@ -29,7 +29,7 @@ export default function VCNPage() {
   const [loadingVCN, setLoadingVCN] = useState(false);
 
   const getHeaders = () => {
-    const creds = sessionStorage.getItem("oci_credentials");
+    const creds = localStorage.getItem("oci_credentials");
     return {
       "Content-Type": "application/json",
       "X-Credentials": creds || "",
@@ -61,7 +61,7 @@ export default function VCNPage() {
     const vcnData = createNew
       ? { type: "new", name: newVCNName, cidr: newVCNCidr, compartment_id: selectedCompartment }
       : { type: "existing", vcn_id: selectedVCN, compartment_id: selectedCompartment };
-    sessionStorage.setItem("oci_vcn", JSON.stringify(vcnData));
+    localStorage.setItem("oci_vcn", JSON.stringify(vcnData));
     window.location.href = "/resources";
   };
 
