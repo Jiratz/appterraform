@@ -108,6 +108,8 @@ function LandingZoneInner() {
 
   useEffect(() => {
     fetch(`${API}/api/tenancies`).then(r => r.json()).then(d => setTenancies(d.tenancies || []));
+    // ถ้ามี ?tenancy= ใน URL → ข้ามไป step 1 เลย
+    if (params.get("tenancy")) setStep(1);
   }, []);
 
   useEffect(() => {

@@ -1,6 +1,7 @@
 "use client";
-import { useEffect, useState, useCallback, useRef } from "react";
+import { useEffect, useState, useCallback, useRef, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, RefreshCw, Play, Square, RotateCcw, Trash2, Server, Wifi, WifiOff, Loader2, Search, X } from "lucide-react";
 
 const API = process.env.NEXT_PUBLIC_API_URL || "";
@@ -43,7 +44,8 @@ function StateBadge({ state }: { state: string }) {
   );
 }
 
-export default function VMsPage() {
+function VMsInner() {
+  const searchParams = useSearchParams();
   const [tenancies, setTenancies] = useState<Tenancy[]>([]);
   const [selectedTenancy, setSelectedTenancy] = useState<string>("");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -58,10 +60,17 @@ export default function VMsPage() {
   const countdownRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const [search, setSearch] = useState("");
 
-  // โหลด tenancies
+  // โหลด tenancies และ pre-select จาก query param
   useEffect(() => {
-    fetch(`${API}/api/tenancies`).then(r => r.json()).then(d => setTenancies(d.tenancies || []));
-  }, []);
+    fetch(`${API}/api/tenancies`).then(r => r.json()).then(d => {
+      const list: Tenancy[] = d.tenancies || [];
+      setTenancies(list);
+      const qTenancy = searchParams.get("tenancy");
+      if (qTenancy && list.find(t => t.id === qTenancy)) {
+        setSelectedTenancy(qTenancy);
+      }
+    });
+  }, [searchParams]);
 
 
   const fetchWorkspaces = useCallback(async () => {
@@ -368,5 +377,13 @@ export default function VMsPage() {
         </div>
       )}
     </main>
+  );
+}
+
+export default function VMsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-gray-950 text-white flex items-center justify-center"><Loader2 className="animate-spin" size={32} /></div>}>
+      <VMsInner />
+    </Suspense>
   );
 }

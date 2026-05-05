@@ -27,6 +27,9 @@ export default function TenanciesPage() {
   const [form, setForm] = useState(BLANK);
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState<string | null>(null);
+  const [editTarget, setEditTarget] = useState<Tenancy | null>(null);
+  const [editForm, setEditForm] = useState({ name: "", region: "", fingerprint: "", private_key: "" });
+  const [editSaving, setEditSaving] = useState(false);
 
   const fetch_ = async () => {
     setLoading(true);
@@ -57,7 +60,7 @@ export default function TenanciesPage() {
       setShowForm(false);
       setForm(BLANK);
       fetch_();
-    } catch (e: any) { toast(e.message, "error"); }
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : "Error", "error"); }
     setSaving(false);
   };
 
@@ -78,6 +81,33 @@ export default function TenanciesPage() {
       toast(d.success ? `✅ "${t.name}" เชื่อมต่อ OCI ได้` : `❌ "${t.name}" เชื่อมต่อไม่ได้`, d.success ? "success" : "error");
     } catch { toast("Validate ล้มเหลว", "error"); }
     setValidating(null);
+  };
+
+  const openEdit = (t: Tenancy) => {
+    setEditTarget(t);
+    setEditForm({ name: t.name, region: t.region, fingerprint: t.fingerprint, private_key: "" });
+  };
+
+  const handleUpdate = async () => {
+    if (!editTarget) return;
+    setEditSaving(true);
+    const body: Record<string, string> = {};
+    if (editForm.name)        body.name        = editForm.name;
+    if (editForm.region)      body.region      = editForm.region;
+    if (editForm.fingerprint) body.fingerprint = editForm.fingerprint;
+    if (editForm.private_key) body.private_key = editForm.private_key;
+    try {
+      const r = await fetch(`${API}/api/tenancies/${editTarget.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      if (!r.ok) throw new Error((await r.json()).detail || "Error");
+      toast(`อัปเดต "${editTarget.name}" สำเร็จ ✅`, "success");
+      setEditTarget(null);
+      fetch_();
+    } catch (e: unknown) { toast(e instanceof Error ? e.message : "Error", "error"); }
+    setEditSaving(false);
   };
 
   return (
@@ -113,10 +143,8 @@ export default function TenanciesPage() {
                   <div key={key}>
                     <label className="text-sm text-gray-400 mb-1 block">{label}</label>
                     <input
-                      title={label}
-                      placeholder={label}
-                      type={type}
-                      value={(form as any)[key]}
+                      title={label} placeholder={label} type={type}
+                      value={(form as Record<string, string>)[key]}
                       onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
                       className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                     />
@@ -124,9 +152,7 @@ export default function TenanciesPage() {
                 ))}
                 <div>
                   <label className="text-sm text-gray-400 mb-1 block">Private Key (PEM)</label>
-                  <textarea
-                    rows={5}
-                    value={form.private_key}
+                  <textarea rows={5} value={form.private_key}
                     onChange={e => setForm(f => ({ ...f, private_key: e.target.value }))}
                     className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-xs text-green-400 font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
                     placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;...&#10;-----END RSA PRIVATE KEY-----"
@@ -141,6 +167,51 @@ export default function TenanciesPage() {
                 <button onClick={handleSave} disabled={saving}
                   className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white py-2.5 rounded-xl font-medium transition">
                   {saving ? "⏳ กำลัง validate..." : "💾 บันทึก"}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Modal */}
+        {editTarget && (
+          <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-gray-900 border border-gray-700 rounded-2xl p-6 w-full max-w-lg">
+              <h2 className="text-xl font-semibold mb-1">✏️ แก้ไข Tenancy</h2>
+              <p className="text-gray-400 text-sm mb-4">ID: <span className="font-mono">{editTarget.id}</span></p>
+              <div className="space-y-3">
+                {[
+                  { key: "name",        label: "ชื่อ" },
+                  { key: "region",      label: "Region" },
+                  { key: "fingerprint", label: "Fingerprint" },
+                ].map(({ key, label }) => (
+                  <div key={key}>
+                    <label className="text-sm text-gray-400 mb-1 block">{label}</label>
+                    <input
+                      title={label} placeholder={label} type="text"
+                      value={(editForm as Record<string, string>)[key]}
+                      onChange={e => setEditForm(f => ({ ...f, [key]: e.target.value }))}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    />
+                  </div>
+                ))}
+                <div>
+                  <label className="text-sm text-gray-400 mb-1 block">Private Key ใหม่ (เว้นว่างถ้าไม่เปลี่ยน)</label>
+                  <textarea rows={4} value={editForm.private_key}
+                    onChange={e => setEditForm(f => ({ ...f, private_key: e.target.value }))}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-lg px-3 py-2 text-xs text-green-400 font-mono focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                    placeholder="-----BEGIN RSA PRIVATE KEY-----&#10;(เว้นว่างถ้าไม่ต้องการเปลี่ยน key)&#10;-----END RSA PRIVATE KEY-----"
+                  />
+                </div>
+              </div>
+              <div className="flex gap-3 mt-5">
+                <button onClick={() => setEditTarget(null)}
+                  className="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-2.5 rounded-xl transition">
+                  ยกเลิก
+                </button>
+                <button onClick={handleUpdate} disabled={editSaving}
+                  className="flex-1 bg-yellow-600 hover:bg-yellow-700 disabled:bg-gray-600 text-white py-2.5 rounded-xl font-medium transition">
+                  {editSaving ? "⏳ กำลังบันทึก..." : "💾 อัปเดต"}
                 </button>
               </div>
             </div>
@@ -172,21 +243,20 @@ export default function TenanciesPage() {
                     </div>
                   </div>
                   <div className="flex flex-col gap-2 ml-4">
-                    <button
-                      onClick={() => handleValidate(t)}
-                      disabled={validating === t.id}
-                      className="text-xs bg-green-900/40 hover:bg-green-800 border border-green-700 text-green-300 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
-                    >
+                    <button onClick={() => handleValidate(t)} disabled={validating === t.id}
+                      className="text-xs bg-green-900/40 hover:bg-green-800 border border-green-700 text-green-300 px-3 py-1.5 rounded-lg transition disabled:opacity-50">
                       {validating === t.id ? "⏳..." : "✅ Test"}
+                    </button>
+                    <button onClick={() => openEdit(t)}
+                      className="text-xs bg-yellow-900/40 hover:bg-yellow-800 border border-yellow-700 text-yellow-300 px-3 py-1.5 rounded-lg transition">
+                      ✏️ แก้ไข
                     </button>
                     <a href={`/landing-zone?tenancy=${t.id}`}
                       className="text-xs bg-purple-900/40 hover:bg-purple-800 border border-purple-700 text-purple-300 px-3 py-1.5 rounded-lg transition text-center">
                       🏗️ LZ
                     </a>
-                    <button
-                      onClick={() => handleDelete(t)}
-                      className="text-xs bg-red-900/40 hover:bg-red-800 border border-red-700 text-red-300 px-3 py-1.5 rounded-lg transition"
-                    >
+                    <button onClick={() => handleDelete(t)}
+                      className="text-xs bg-red-900/40 hover:bg-red-800 border border-red-700 text-red-300 px-3 py-1.5 rounded-lg transition">
                       🗑️ ลบ
                     </button>
                   </div>
@@ -195,10 +265,6 @@ export default function TenanciesPage() {
             ))}
           </div>
         )}
-
-        <div className="mt-8">
-          <a href="/" className="text-gray-500 hover:text-gray-300 text-sm transition">← กลับหน้าหลัก</a>
-        </div>
       </div>
     </div>
   );
